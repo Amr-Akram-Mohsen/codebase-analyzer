@@ -50,7 +50,7 @@ class TestEncapsulation:
         assert len(findings) == 1
         assert findings[0].kind == FindingKind.ENCAPSULATION_VIOLATION
         assert findings[0].severity == Severity.ERROR
-        assert "bypassed public API" in findings[0].message
+        assert "Bypassed public API" in findings[0].message
 
     def test_boundary_rule_allows_root_import(self) -> None:
         modules = [
@@ -106,4 +106,4 @@ class TestEncapsulation:
         
         # Only the 3rd import should be blocked
         assert len(findings) == 1
-        assert "bypassed public API by directly importing 'myapp.domain.internal.db'" in findings[0].message
+        assert "Bypassed public API by directly importing 'myapp.domain.internal.db'" in findings[0].message

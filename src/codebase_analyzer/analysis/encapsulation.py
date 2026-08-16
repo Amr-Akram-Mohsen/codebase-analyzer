@@ -51,7 +51,7 @@ def detect_encapsulation_violations(
                         Finding(
                             kind=FindingKind.ENCAPSULATION_VIOLATION,
                             severity=Severity.WARNING,
-                            message=f"Encapsulation violation: '{source}' imported private module '{target}'.",
+                            message=f"Imported private module '{target}'",
                             location=Location(module=source, line=imp.line_number),
                         )
                     )
@@ -79,7 +79,7 @@ def detect_encapsulation_violations(
                                 Finding(
                                     kind=FindingKind.ENCAPSULATION_VIOLATION,
                                     severity=Severity.ERROR,
-                                    message=f"Boundary violation: '{source}' bypassed public API by directly importing '{target}'.",
+                                    message=f"Bypassed public API by directly importing '{target}'",
                                     location=Location(module=source, line=imp.line_number),
                                 )
                             )

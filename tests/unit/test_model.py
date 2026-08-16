@@ -224,13 +224,15 @@ class TestEnums:
     def test_finding_kind_members(self) -> None:
         kinds = {k.value for k in FindingKind}
         assert kinds == {
-            "IMPORT_CYCLE", 
-            "NAME_COLLISION", 
-            "LAYER_VIOLATION", 
+            "IMPORT_CYCLE",
+            "NAME_COLLISION",
+            "LAYER_VIOLATION",
             "PARSE_ERROR",
             "ENCAPSULATION_VIOLATION",
             "COMMENTED_CODE",
             "DEAD_CODE",
+            "GOD_OBJECT",
+            "COMPLEX_FUNCTION",
         }
 
     def test_severity_members(self) -> None:

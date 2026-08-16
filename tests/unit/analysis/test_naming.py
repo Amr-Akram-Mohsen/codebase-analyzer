@@ -57,7 +57,7 @@ class TestNamingCollisions:
                 qualified_name="myapp.c",
                 classes=[],
                 functions=[
-                    FunctionDef(name="setup", line_number=5), 
+                    FunctionDef(name="setup", line_number=5),
                     FunctionDef(name="setup", line_number=10),
                     FunctionDef(name="teardown", line_number=20),
                     FunctionDef(name="teardown", line_number=25),
@@ -65,15 +65,17 @@ class TestNamingCollisions:
                 imports=[],
             ),
         ]
-        
+
         findings = detect_name_collisions(modules)
         assert len(findings) == 2
-        
+
         assert findings[0].kind == FindingKind.NAME_COLLISION
-        assert "Multiple function name collisions in c.py:\n  - 'setup' at lines 5, 10" in findings[0].message
-        
+        assert "'setup' is already defined at line 5" in findings[0].message
+        assert findings[0].location.line == 10
+
         assert findings[1].kind == FindingKind.NAME_COLLISION
-        assert "Multiple function name collisions in c.py:\n  - 'teardown' at lines 20, 25" in findings[1].message
+        assert "'teardown' is already defined at line 20" in findings[1].message
+        assert findings[1].location.line == 25
 
     def test_intra_file_class_collision(self) -> None:
         modules = [
@@ -88,9 +90,10 @@ class TestNamingCollisions:
                 imports=[],
             ),
         ]
-        
+
         findings = detect_name_collisions(modules)
         assert len(findings) == 1
-        
+
         assert findings[0].kind == FindingKind.NAME_COLLISION
-        assert "Multiple class name collisions in d.py:\n  - 'User' at lines 5, 20" in findings[0].message
+        assert "'User' is already defined at line 5" in findings[0].message
+        assert findings[0].location.line == 20

@@ -29,9 +29,12 @@ def detect_dead_code(
     # We will treat them as prefixes so you can whitelist `cli` or `cli.main`
     
     # Default ubiquitous entry points in the Python ecosystem
-    DEFAULT_ENTRY_POINTS = ("migrations", "alembic", "scripts", "bin", "setup.py", "manage.py", "demo", "example")
+    DEFAULT_ENTRY_POINTS = ("migrations", "alembic", "scripts", "bin", "setup.py", "manage.py", "demo", "example", "helpers")
     
     for m in modules:
+        if getattr(m, "has_main_block", False):
+            continue
+            
         qname = m.qualified_name
         path_str = m.path.replace("\\", "/")
         
@@ -71,7 +74,7 @@ def detect_dead_code(
                 Finding(
                     kind=FindingKind.DEAD_CODE,
                     severity=Severity.WARNING,
-                    message=f"Orphaned Module: '{qname}' is never imported by any other file.",
+                    message=f"'{qname}' is never imported",
                     location=Location(module=qname, line=None),
                 )
             )

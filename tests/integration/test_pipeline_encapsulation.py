@@ -47,6 +47,6 @@ def test_pipeline_detects_encapsulation_violations(tmp_path: Path) -> None:
     assert "api.routes" in private_violation.location.module
     
     # Boundary rule check
-    boundary_violation = next(f for f in encap_findings if "bypassed public API" in f.message)
+    boundary_violation = next(f for f in encap_findings if "Bypassed public API" in f.message)
     assert boundary_violation.severity == Severity.ERROR
     assert "api.routes" in boundary_violation.location.module

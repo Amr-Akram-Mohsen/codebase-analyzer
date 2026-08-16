@@ -18,5 +18,4 @@ def test_pipeline_detects_name_collisions() -> None:
     assert len(collision_findings) == 1
     
     msg = collision_findings[0].message
-    assert "Multiple function name collisions in " in msg
-    assert "'setup' at lines 4, 7" in msg
+    assert "'setup' is already defined at line 4" in msg

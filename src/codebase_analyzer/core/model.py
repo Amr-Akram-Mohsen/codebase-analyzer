@@ -31,6 +31,8 @@ class FindingKind(Enum):
     COMMENTED_CODE = "COMMENTED_CODE"
     DEAD_CODE = "DEAD_CODE"
     PARSE_ERROR = "PARSE_ERROR"
+    GOD_OBJECT = "GOD_OBJECT"
+    COMPLEX_FUNCTION = "COMPLEX_FUNCTION"
 
 
 class Severity(Enum):
@@ -58,6 +60,7 @@ class FunctionDef:
     name: str
     line_number: int
     end_line_number: int | None = None
+    complexity: int = 1
 
 
 @dataclass(frozen=True)
@@ -105,6 +108,7 @@ class Module:
     classes: list[ClassDef]
     functions: list[FunctionDef]
     imports: list[ImportRef]
+    has_main_block: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -187,3 +191,5 @@ class AnalysisConfig:
     encapsulation_boundaries: list[str] = field(default_factory=list)
     encapsulation_public_apis: dict[str, list[str]] = field(default_factory=dict)
     dead_code_entry_points: list[str] = field(default_factory=list)
+    metrics_max_fan_out: int = 15
+    metrics_max_complexity: int = 10

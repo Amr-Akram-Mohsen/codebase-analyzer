@@ -24,10 +24,9 @@ class TestTerminalReporter:
         
         output = format_terminal(result, use_color=False)
         assert isinstance(output, str)
+        assert "Codebase Analyzer Report" in output
         assert "/path/to/project" in output
-        assert "Modules parsed: 1" in output
-        assert "Detailed Findings:" not in output
-        assert "Errors: 0" in output
+        assert "✖ 0 Errors | ⚠ 0 Warnings | ℹ 0 Infos" in output
 
     def test_with_error_finding(self) -> None:
         result = AnalysisResult(
@@ -45,11 +44,12 @@ class TestTerminalReporter:
         
         output = format_terminal(result, use_color=False)
         assert isinstance(output, str)
-        assert "Detailed Findings:" in output
-        assert "IMPORT_CYCLE" in output
+        assert "myapp.a" in output
+        assert "10" in output
+        assert "error" in output
         assert "A circular dependency occurred" in output
-        assert "[myapp.a:10]" in output
-        assert "Errors: 1" in output
+        assert "IMPORT_CYCLE" in output
+        assert "✖ 1 Errors" in output
 
     def test_no_color(self) -> None:
         result = AnalysisResult(

@@ -27,9 +27,14 @@ def discover_python_files(root_dir: str | Path) -> list[Path]:
 
     for dirpath, dirnames, filenames in os.walk(root_path):
         # Modify dirnames in-place to skip unwanted directories
-        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS and not d.startswith(".")]
         
         current_dir = Path(dirpath)
+        
+        # Double check the current_dir just in case root_dir itself contained a skipped dir
+        if any(part in SKIP_DIRS or part.startswith(".") for part in current_dir.parts):
+            continue
+            
         for filename in filenames:
             if filename.endswith(".py"):
                 python_files.append(current_dir / filename)

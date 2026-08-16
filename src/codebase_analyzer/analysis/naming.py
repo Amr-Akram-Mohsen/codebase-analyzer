@@ -25,15 +25,16 @@ def detect_name_collisions(modules: list[Module]) -> list[Finding]:
             
         for name, lines in seen_classes.items():
             if len(lines) > 1:
-                lines_str = ", ".join(map(str, sorted(lines)))
-                findings.append(
-                    Finding(
-                        kind=FindingKind.NAME_COLLISION,
-                        severity=Severity.ERROR,
-                        message=f"Multiple class name collisions in {m.path}:\n  - '{name}' at lines {lines_str}",
-                        location=Location(module=m.qualified_name, line=lines[0]),
+                original_line = sorted(lines)[0]
+                for collision_line in sorted(lines)[1:]:
+                    findings.append(
+                        Finding(
+                            kind=FindingKind.NAME_COLLISION,
+                            severity=Severity.ERROR,
+                            message=f"'{name}' is already defined at line {original_line}",
+                            location=Location(module=m.qualified_name, line=collision_line),
+                        )
                     )
-                )
                 
         # Check intra-file function collisions
         seen_funcs: dict[str, list[int]] = defaultdict(list)
@@ -42,15 +43,16 @@ def detect_name_collisions(modules: list[Module]) -> list[Finding]:
             
         for name, lines in seen_funcs.items():
             if len(lines) > 1:
-                lines_str = ", ".join(map(str, sorted(lines)))
-                findings.append(
-                    Finding(
-                        kind=FindingKind.NAME_COLLISION,
-                        severity=Severity.ERROR,
-                        message=f"Multiple function name collisions in {m.path}:\n  - '{name}' at lines {lines_str}",
-                        location=Location(module=m.qualified_name, line=lines[0]),
+                original_line = sorted(lines)[0]
+                for collision_line in sorted(lines)[1:]:
+                    findings.append(
+                        Finding(
+                            kind=FindingKind.NAME_COLLISION,
+                            severity=Severity.ERROR,
+                            message=f"'{name}' is already defined at line {original_line}",
+                            location=Location(module=m.qualified_name, line=collision_line),
+                        )
                     )
-                )
 
     # Sort findings by location module to ensure deterministic output
     findings.sort(key=lambda f: (f.location.module if f.location else "", f.message))

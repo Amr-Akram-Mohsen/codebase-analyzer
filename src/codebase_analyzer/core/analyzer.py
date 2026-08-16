@@ -70,8 +70,15 @@ def analyze(path: str | Path, config: AnalysisConfig) -> AnalysisResult:
     dead_code_findings = detect_dead_code(modules, graph, config.dead_code_entry_points)
     findings.extend(dead_code_findings)
     
+    # 10. Detect God Objects (metrics)
+    from codebase_analyzer.analysis.metrics import detect_god_objects, detect_complex_functions
+    god_object_findings = detect_god_objects(modules, graph, config.metrics_max_fan_out)
+    findings.extend(god_object_findings)
+    
+    # 11. Detect Complex Functions
+    complex_function_findings = detect_complex_functions(modules, config.metrics_max_complexity)
+    findings.extend(complex_function_findings)
+    
     return AnalysisResult(
-        project_root=str(project_root),
-        modules=modules,
-        findings=findings,
+        project_root=str(project_root), modules=modules, findings=findings
     )

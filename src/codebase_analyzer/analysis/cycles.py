@@ -2,7 +2,7 @@
 Detects import cycles in project-internal dependency graphs.
 """
 
-from codebase_analyzer.core.model import Finding, FindingKind, Severity
+from codebase_analyzer.core.model import Finding, FindingKind, Severity, Location
 
 
 def find_cycles(graph: dict[str, set[str]]) -> list[Finding]:
@@ -58,13 +58,13 @@ def find_cycles(graph: dict[str, set[str]]) -> list[Finding]:
     findings = []
     for cycle in sorted(cycles, key=lambda c: c[0]):
         modules_str = " -> ".join(cycle + [cycle[0]])
-        message = f"Circular import detected: {modules_str}"
+        message = f"Cycle: {modules_str}"
         findings.append(
             Finding(
                 kind=FindingKind.IMPORT_CYCLE,
                 severity=Severity.ERROR,
                 message=message,
-                location=None,
+                location=Location(module=cycle[0], line=None),
             )
         )
         

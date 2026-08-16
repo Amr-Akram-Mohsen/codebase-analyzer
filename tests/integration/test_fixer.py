@@ -26,7 +26,7 @@ def test_fix_duplicate_identical_function(tmp_path: Path) -> None:
     file_path = tmp_path / "dup.py"
     file_path.write_text(code, encoding="utf-8")
     
-    config = AnalysisConfig(layer_rules=[])
+    config = AnalysisConfig(layer_rules=[], dead_code_entry_points=["dup"])
     result = analyze(tmp_path, config)
     
     apply_safe_fixes(result, [str(tmp_path)])
@@ -51,7 +51,7 @@ def test_no_fix_different_functions(tmp_path: Path) -> None:
     file_path = tmp_path / "dup.py"
     file_path.write_text(code, encoding="utf-8")
     
-    config = AnalysisConfig(layer_rules=[])
+    config = AnalysisConfig(layer_rules=[], dead_code_entry_points=["dup"])
     result = analyze(tmp_path, config)
     
     apply_safe_fixes(result, [str(tmp_path)])
@@ -79,7 +79,7 @@ def test_fix_commented_code(tmp_path: Path) -> None:
     file_path = tmp_path / "comment.py"
     file_path.write_text(code, encoding="utf-8")
     
-    config = AnalysisConfig(layer_rules=[])
+    config = AnalysisConfig(layer_rules=[], dead_code_entry_points=["comment"])
     result = analyze(tmp_path, config)
     
     apply_safe_fixes(result, [str(tmp_path)])

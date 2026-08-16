@@ -17,6 +17,12 @@ def main() -> int:
     Parses arguments, configures the analysis, runs it, formats the output,
     and returns the appropriate exit code.
     """
+    # Ensure stdout supports UTF-8 characters like ✖, ⚠, ℹ
+    if sys.stdout and hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
     parser = argparse.ArgumentParser(
         description="Analyze Python codebases for structural and architectural findings."
     )
@@ -25,13 +31,13 @@ def main() -> int:
         type=str,
         nargs="?",
         default="analyze",
-        help="Command to run: 'analyze' (default) or 'fix'",
+        help="Command to run: 'analyze' (default), 'fix', or 'graph'",
     )
     parser.add_argument(
         "paths",
         type=str,
         nargs="+",
-        help="Path(s) to the project directory to analyze, or files to fix.",
+        help="Path(s) to the project directory to analyze, or files to fix/graph.",
     )
     parser.add_argument(
         "--format",
@@ -52,13 +58,10 @@ def main() -> int:
     
     args = parser.parse_args()
     
-    # If the command is 'fix', the first path is the project root (or we just use the first path as root)
-    target_path = Path(args.paths[0])
-    
     # If user ran `codebase-analyzer .`, command='.', paths=[]
     # Wait, because command is nargs="?", it might capture the path!
     # Let's fix argument parsing manually for backward compatibility.
-    if args.command not in ["analyze", "fix"]:
+    if args.command not in ["analyze", "fix", "graph"]:
         # The user just typed `codebase-analyzer path`
         args.paths.insert(0, args.command)
         args.command = "analyze"
@@ -103,15 +106,25 @@ def main() -> int:
                 public_apis = {}
                     
             dead_code_data = tool_data.get("dead_code", {})
-            entry_points = dead_code_data.get("entry_points", [])
-            if not isinstance(entry_points, list):
-                entry_points = []
+            metrics_data = tool_data.get("metrics", {})
+            
+            max_fan_out = metrics_data.get("max_fan_out", 15)
+            if not isinstance(max_fan_out, int):
+                max_fan_out = 15
+                
+            max_complexity = metrics_data.get("max_complexity", 10)
+            if not isinstance(max_complexity, int):
+                max_complexity = 10
                     
+            layer_rules = [LayerRule(name=n, prefixes=p) for n, p in layers_data.items() if isinstance(p, list)]
+            
             config = AnalysisConfig(
                 layer_rules=layer_rules, 
-                encapsulation_boundaries=boundaries,
-                encapsulation_public_apis=public_apis,
-                dead_code_entry_points=entry_points,
+                encapsulation_boundaries=encapsulation_data.get("boundaries", []),
+                encapsulation_public_apis=encapsulation_data.get("public_apis", {}),
+                dead_code_entry_points=dead_code_data.get("entry_points", []),
+                metrics_max_fan_out=max_fan_out,
+                metrics_max_complexity=max_complexity
             )
         except Exception as e:
             print(f"Error loading config file: {e}", file=sys.stderr)
@@ -125,6 +138,13 @@ def main() -> int:
             print("Auto-fixing complete. Re-running analysis...")
             # Re-run analysis to get clean output
             result = analyze(target_path, config)
+        elif args.command == "graph":
+            from codebase_analyzer.analysis.dependencies import build_dependency_graph
+            graph = build_dependency_graph(result.modules)
+            from codebase_analyzer.reporting.mermaid import generate_mermaid_diagram
+            out_file = args.output if args.output else "architecture.md"
+            generate_mermaid_diagram(result, graph, out_file)
+            sys.exit(0)
     except KeyboardInterrupt:
         print("\nAnalysis interrupted by user.", file=sys.stderr)
         return 2
