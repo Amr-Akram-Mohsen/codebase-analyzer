@@ -36,3 +36,17 @@ Thumbs.db
 
 # Nexora Website Here for Testing
 Nexora/
+util_files/
+
+# Additional Python caches
+.mypy_cache/
+.ruff_cache/
+
+# Environment files & local configs
+.env.*
+!.env.example
+codebase-analyzer.local.toml
+
+# Local scratch outputs & reports
+reports-local/
+.local/
