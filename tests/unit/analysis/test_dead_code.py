@@ -118,3 +118,30 @@ class TestDeadCode:
         
         # None of these should be flagged as orphaned because they are in DEFAULT_ENTRY_POINTS
         assert len(findings) == 0
+
+    def test_dynamic_string_literals_boundary_precision(self) -> None:
+        # Module named "myapp.utils"
+        m1 = Module(
+            path="myapp/utils.py",
+            qualified_name="myapp.utils",
+            classes=[],
+            functions=[],
+            imports=[],
+            string_literals=["myapp.utils.helper", "my_utils_unrelated"],
+        )
+        # Module named "myapp.core"
+        m2 = Module(
+            path="myapp/core.py",
+            qualified_name="myapp.core",
+            classes=[],
+            functions=[],
+            imports=[],
+            string_literals=["hardcore_processing"],
+        )
+        
+        # m1 ("myapp.utils") is referenced as "myapp.utils.helper" -> should be ignored (dynamic)
+        # m2 ("myapp.core") only has "hardcore_processing" (substring without dot) -> should NOT be ignored
+        findings = detect_dead_code([m1, m2], graph={}, entry_points=[])
+        
+        assert len(findings) == 1
+        assert findings[0].location.module == "myapp.core"

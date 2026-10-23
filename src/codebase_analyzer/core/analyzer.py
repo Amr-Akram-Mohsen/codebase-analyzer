@@ -65,10 +65,13 @@ def analyze(path: str | Path, config: AnalysisConfig) -> AnalysisResult:
     commented_code_findings = detect_commented_code(modules, str(project_root))
     findings.extend(commented_code_findings)
     
-    # 9. Detect dead code (orphaned modules)
-    from codebase_analyzer.analysis.dead_code import detect_dead_code
+    # 9. Detect dead code (orphaned modules & dead symbols)
+    from codebase_analyzer.analysis.dead_code import detect_dead_code, detect_dead_symbols
     dead_code_findings = detect_dead_code(modules, graph, config.dead_code_entry_points)
     findings.extend(dead_code_findings)
+    
+    dead_symbol_findings = detect_dead_symbols(modules, config.dead_code_entry_points)
+    findings.extend(dead_symbol_findings)
     
     # 10. Detect God Objects (metrics)
     from codebase_analyzer.analysis.metrics import detect_god_objects, detect_complex_functions

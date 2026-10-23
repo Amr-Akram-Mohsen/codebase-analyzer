@@ -8,7 +8,34 @@ from codebase_analyzer.core.model import AnalysisResult, Finding, FindingKind, L
 from codebase_analyzer.fixer.safe_fixer import apply_safe_fixes
 
 
-def test_fixer_deletes_dead_code(tmp_path: Path) -> None:
+def test_fixer_does_not_delete_dead_code_by_default(tmp_path: Path) -> None:
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    
+    dead_file = project_root / "dead.py"
+    dead_file.write_text("def unused(): pass\n")
+    
+    result = AnalysisResult(
+        project_root=str(project_root),
+        modules=[
+            Module(path="dead.py", qualified_name="dead", classes=[], functions=[], imports=[]),
+        ],
+        findings=[
+            Finding(
+                kind=FindingKind.DEAD_CODE,
+                severity=None,
+                message="Orphaned Module",
+                location=Location(module="dead", line=None),
+            )
+        ],
+    )
+    
+    # Default: delete_dead_code=False
+    apply_safe_fixes(result, target_paths=[str(project_root)])
+    assert dead_file.exists(), "dead.py should NOT be deleted by default"
+
+
+def test_fixer_deletes_dead_code_when_explicitly_requested(tmp_path: Path) -> None:
     # Set up a fake project root in the temp directory
     project_root = tmp_path / "project"
     project_root.mkdir()
@@ -37,15 +64,16 @@ def test_fixer_deletes_dead_code(tmp_path: Path) -> None:
         ],
     )
     
-    # Apply safe fixes targeting the whole project
-    apply_safe_fixes(result, target_paths=[str(project_root)])
+    # Apply safe fixes targeting the whole project with delete_dead_code=True
+    apply_safe_fixes(result, target_paths=[str(project_root)], delete_dead_code=True)
     
     # Verify the dead file was deleted
-    assert not dead_file.exists(), "dead.py should have been deleted by the fixer"
+    assert not dead_file.exists(), "dead.py should have been deleted when delete_dead_code=True"
     
     # Verify the active file remains untouched
     assert active_file.exists(), "active.py should not have been touched"
     assert active_file.read_text() == "def run(): pass\n"
+
 
 def test_fixer_only_deletes_targeted_dead_code(tmp_path: Path) -> None:
     # Set up a fake project root in the temp directory
@@ -81,8 +109,8 @@ def test_fixer_only_deletes_targeted_dead_code(tmp_path: Path) -> None:
         ],
     )
     
-    # Target only dead1
-    apply_safe_fixes(result, target_paths=[str(dead1)])
+    # Target only dead1 with delete_dead_code=True
+    apply_safe_fixes(result, target_paths=[str(dead1)], delete_dead_code=True)
     
     # dead1 should be deleted, dead2 should remain
     assert not dead1.exists()

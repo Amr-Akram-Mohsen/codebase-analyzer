@@ -7,11 +7,16 @@ from pathlib import Path
 from codebase_analyzer.core.model import AnalysisResult, FindingKind, FunctionDef, Module
 
 
-def apply_safe_fixes(result: AnalysisResult, target_paths: list[str]) -> None:
+def apply_safe_fixes(
+    result: AnalysisResult,
+    target_paths: list[str],
+    delete_dead_code: bool = False,
+) -> None:
     """
     Applies fixes to specific files or directories.
     1. Deletes exactly identical duplicate functions in the same file.
     2. Deletes detected commented-out structural code.
+    3. Deletes orphaned dead code modules ONLY if delete_dead_code is True.
     """
     project_root = Path(result.project_root)
     resolved_targets = [Path(p).resolve() for p in target_paths]
@@ -47,8 +52,8 @@ def apply_safe_fixes(result: AnalysisResult, target_paths: list[str]) -> None:
         if not is_targeted:
             continue
             
-        # 0. Delete Dead Code (Orphaned Modules)
-        if m.qualified_name in dead_code_modules:
+        # 0. Delete Dead Code (Orphaned Modules) - ONLY if explicitly requested
+        if delete_dead_code and m.qualified_name in dead_code_modules:
             try:
                 file_path.unlink()
                 print(f"Deleted dead code file: {m.path}")
@@ -71,7 +76,7 @@ def apply_safe_fixes(result: AnalysisResult, target_paths: list[str]) -> None:
                     lines_to_delete.add(i)
                     
         # 2. Delete Identical Duplicate Functions
-        # Helper to process a list of functions
+        # Helper to process a list of functions (m.functions contains scoped names for all funcs & methods)
         def process_functions(funcs: list[FunctionDef]):
             seen_funcs: dict[str, tuple[int, int, str]] = {}
             for fn in funcs:
@@ -86,10 +91,7 @@ def apply_safe_fixes(result: AnalysisResult, target_paths: list[str]) -> None:
                 if fn.name in seen_funcs:
                     prev_start, prev_end, prev_text = seen_funcs[fn.name]
                     if raw_text == prev_text:
-                        # 100% Identical! Delete the current one.
-                        # Also delete decorators if they exist (heuristically, anything above the def that starts with @)
-                        # We didn't capture decorators accurately in parser, but we can safely delete from start_idx to end_idx.
-                        # Wait, the ast line_number for function includes decorators in python 3.8+.
+                        # 100% Identical! Delete the duplicate.
                         for i in range(start_idx, end_idx):
                             lines_to_delete.add(i)
                         continue
@@ -97,8 +99,6 @@ def apply_safe_fixes(result: AnalysisResult, target_paths: list[str]) -> None:
                 seen_funcs[fn.name] = (start_idx, end_idx, raw_text)
 
         process_functions(m.functions)
-        for c in m.classes:
-            process_functions(c.methods)
             
         if lines_to_delete:
             new_lines = []

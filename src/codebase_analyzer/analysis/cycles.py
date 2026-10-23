@@ -5,11 +5,62 @@ Detects import cycles in project-internal dependency graphs.
 from codebase_analyzer.core.model import Finding, FindingKind, Severity, Location
 
 
+def _find_cycles_in_scc(scc: list[str], graph: dict[str, set[str]]) -> list[list[str]]:
+    """
+    Extracts true directed elementary cycles from a strongly connected component.
+    """
+    scc_set = set(scc)
+    subgraph = {u: sorted([v for v in graph.get(u, set()) if v in scc_set]) for u in scc}
+    
+    found_cycles: list[list[str]] = []
+    seen_tuples: set[tuple[str, ...]] = set()
+    
+    def dfs(start: str, current: str, path: list[str], visited: set[str]) -> None:
+        for nxt in subgraph.get(current, []):
+            if nxt == start:
+                if len(path) > 1:
+                    min_idx = path.index(min(path))
+                    canonical = tuple(path[min_idx:] + path[:min_idx])
+                    if canonical not in seen_tuples:
+                        seen_tuples.add(canonical)
+                        found_cycles.append(list(canonical))
+            elif nxt not in visited and nxt > start:
+                visited.add(nxt)
+                dfs(start, nxt, path + [nxt], visited)
+                visited.remove(nxt)
+                
+    nodes = sorted(scc)
+    for start_node in nodes:
+        dfs(start_node, start_node, [start_node], {start_node})
+        
+    if not found_cycles:
+        # Fallback to trace any directed cycle in the SCC
+        def find_any_cycle(u: str, current_path: list[str], in_path: dict[str, int]) -> list[str] | None:
+            for v in subgraph.get(u, []):
+                if v in in_path:
+                    cycle_start = in_path[v]
+                    return current_path[cycle_start:]
+                res = find_any_cycle(v, current_path + [v], {**in_path, v: len(current_path)})
+                if res:
+                    return res
+            return None
+            
+        fallback = find_any_cycle(nodes[0], [nodes[0]], {nodes[0]: 0})
+        if fallback:
+            min_idx = fallback.index(min(fallback))
+            canonical_fb = fallback[min_idx:] + fallback[:min_idx]
+            return [canonical_fb]
+        return [nodes]
+        
+    return found_cycles
+
+
 def find_cycles(graph: dict[str, set[str]]) -> list[Finding]:
     """
-    Detects circular dependencies in the module graph using Tarjan's SCC algorithm.
+    Detects circular dependencies in the module graph using Tarjan's SCC algorithm
+    combined with directed cycle path extraction.
     
-    Each strongly connected component with more than one node represents a cycle.
+    Each directed cycle is reported with its true dependency path (e.g. A -> B -> C -> A).
     Self-loops (a module importing itself) are also reported as cycles.
     """
     index = 0
@@ -44,9 +95,10 @@ def find_cycles(graph: dict[str, set[str]]) -> list[Finding]:
                 if w == node:
                     break
             
-            # SCC of size > 1 is a cycle
+            # SCC of size > 1 is a cycle (extract true directed cycle paths)
             if len(scc) > 1:
-                cycles.append(sorted(scc))
+                directed_cycles = _find_cycles_in_scc(scc, graph)
+                cycles.extend(directed_cycles)
             # Self-loop
             elif len(scc) == 1 and node in graph.get(node, set()):
                 cycles.append([node])
@@ -56,7 +108,7 @@ def find_cycles(graph: dict[str, set[str]]) -> list[Finding]:
             strongconnect(node)
             
     findings = []
-    for cycle in sorted(cycles, key=lambda c: c[0]):
+    for cycle in sorted(cycles, key=lambda c: (c[0], len(c), c)):
         modules_str = " -> ".join(cycle + [cycle[0]])
         message = f"Cycle: {modules_str}"
         findings.append(

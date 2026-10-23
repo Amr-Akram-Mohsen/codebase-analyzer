@@ -54,6 +54,14 @@ class Severity(Enum):
 
 
 @dataclass(frozen=True)
+class VariableDef:
+    """A module-level variable or constant definition extracted from source."""
+
+    name: str
+    line_number: int
+
+
+@dataclass(frozen=True)
 class FunctionDef:
     """A function or method definition extracted from source."""
 
@@ -61,6 +69,8 @@ class FunctionDef:
     line_number: int
     end_line_number: int | None = None
     complexity: int = 1
+    decorators: list[str] = field(default_factory=list)
+    is_method: bool = False
 
 
 @dataclass(frozen=True)
@@ -71,6 +81,7 @@ class ClassDef:
     line_number: int
     methods: list[FunctionDef]
     end_line_number: int | None = None
+    decorators: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -109,6 +120,10 @@ class Module:
     functions: list[FunctionDef]
     imports: list[ImportRef]
     has_main_block: bool = False
+    string_literals: list[str] = field(default_factory=list)
+    referenced_names: set[str] = field(default_factory=set)
+    exported_names: set[str] = field(default_factory=set)
+    variables: list[VariableDef] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

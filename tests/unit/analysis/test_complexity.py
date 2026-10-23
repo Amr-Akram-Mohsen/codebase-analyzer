@@ -38,3 +38,29 @@ def complex_function(items):
     assert len(findings) == 1
     assert "'complex_function' (Complexity: 4)" in findings[0].message
     assert findings[0].location.module == "complex"
+
+
+def test_advanced_complexity_constructs(tmp_path: Path):
+    """
+    Verifies that IfExp, Assert, and Comprehension `if` clauses contribute to complexity.
+    """
+    content = """
+def ternary_and_assert(x):
+    # 1 (base) + 1 (IfExp) + 1 (Assert) = 3
+    y = 10 if x > 0 else 20
+    assert y == 10
+    return y
+
+def comprehension_with_if(items):
+    # 1 (base) + 2 (two if clauses) = 3
+    return [x for x in items if x > 0 if x % 2 == 0]
+"""
+    file_path = tmp_path / "advanced.py"
+    file_path.write_text(content)
+    
+    result = parse_module(file_path, tmp_path)
+    assert isinstance(result, Module)
+    
+    funcs = {f.name: f.complexity for f in result.functions}
+    assert funcs["ternary_and_assert"] == 3
+    assert funcs["comprehension_with_if"] == 3

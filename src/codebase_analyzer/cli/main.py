@@ -55,6 +55,11 @@ def main() -> int:
         type=str,
         help="Path to configuration file (TOML format)",
     )
+    parser.add_argument(
+        "--delete-dead-code",
+        action="store_true",
+        help="Also delete orphaned dead-code files when running 'fix' (WARNING: destructive)",
+    )
     
     args = parser.parse_args()
     
@@ -91,10 +96,11 @@ def main() -> int:
             tool_data = data.get("tool", {}).get("codebase-analyzer", {})
             layers_data = tool_data.get("layers", {})
             
-            layer_rules = []
-            for layer_name, prefixes in layers_data.items():
-                if isinstance(prefixes, list):
-                    layer_rules.append(LayerRule(name=layer_name, prefixes=prefixes))
+            layer_rules = [
+                LayerRule(name=layer_name, prefixes=prefixes)
+                for layer_name, prefixes in layers_data.items()
+                if isinstance(prefixes, list)
+            ]
                     
             encapsulation_data = tool_data.get("encapsulation", {})
             boundaries = encapsulation_data.get("boundaries", [])
@@ -115,13 +121,11 @@ def main() -> int:
             max_complexity = metrics_data.get("max_complexity", 10)
             if not isinstance(max_complexity, int):
                 max_complexity = 10
-                    
-            layer_rules = [LayerRule(name=n, prefixes=p) for n, p in layers_data.items() if isinstance(p, list)]
             
             config = AnalysisConfig(
                 layer_rules=layer_rules, 
-                encapsulation_boundaries=encapsulation_data.get("boundaries", []),
-                encapsulation_public_apis=encapsulation_data.get("public_apis", {}),
+                encapsulation_boundaries=boundaries,
+                encapsulation_public_apis=public_apis,
                 dead_code_entry_points=dead_code_data.get("entry_points", []),
                 metrics_max_fan_out=max_fan_out,
                 metrics_max_complexity=max_complexity
@@ -134,7 +138,7 @@ def main() -> int:
         result = analyze(target_path, config)
         if args.command == "fix":
             from codebase_analyzer.fixer.safe_fixer import apply_safe_fixes
-            apply_safe_fixes(result, args.paths)
+            apply_safe_fixes(result, args.paths, delete_dead_code=args.delete_dead_code)
             print("Auto-fixing complete. Re-running analysis...")
             # Re-run analysis to get clean output
             result = analyze(target_path, config)

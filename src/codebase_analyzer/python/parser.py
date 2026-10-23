@@ -16,7 +16,20 @@ from codebase_analyzer.core.model import (
     Location,
     Module,
     Severity,
+    VariableDef,
 )
+
+
+def _get_decorator_name(node: ast.expr) -> str:
+    """Extracts a dotted decorator name from an AST node."""
+    if isinstance(node, ast.Name):
+        return node.id
+    elif isinstance(node, ast.Attribute):
+        base = _get_decorator_name(node.value)
+        return f"{base}.{node.attr}" if base else node.attr
+    elif isinstance(node, ast.Call):
+        return _get_decorator_name(node.func)
+    return ""
 
 
 def _get_qualified_name(file_path: Path, package_root: Path) -> str:
@@ -108,6 +121,18 @@ class ComplexityVisitor(ast.NodeVisitor):
         self.complexity += 1
         self.generic_visit(node)
         
+    def visit_IfExp(self, node):
+        self.complexity += 1
+        self.generic_visit(node)
+        
+    def visit_Assert(self, node):
+        self.complexity += 1
+        self.generic_visit(node)
+        
+    def visit_comprehension(self, node):
+        self.complexity += len(node.ifs)
+        self.generic_visit(node)
+        
     def visit_FunctionDef(self, node):
         # Do not recurse into nested functions when calculating parent complexity!
         pass
@@ -133,17 +158,26 @@ class ModuleVisitor(ast.NodeVisitor):
         self.imports: list[ImportRef] = []
         self.has_main_block: bool = False
         self._current_scope: str | None = None
+        self._in_class: bool = False
+        self.string_literals: list[str] = []
+        self.referenced_names: set[str] = set()
+        self.exported_names: set[str] = set()
+        self.variables: list[VariableDef] = []
 
     def visit_ClassDef(self, node):
+        decorators = [_get_decorator_name(d) for d in node.decorator_list]
         methods = []
         for item in node.body:
             if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                method_decorators = [_get_decorator_name(d) for d in item.decorator_list]
                 methods.append(
                     FunctionDef(
                         name=item.name,
                         line_number=item.lineno,
                         end_line_number=getattr(item, "end_lineno", None),
-                        complexity=calculate_complexity(item)
+                        complexity=calculate_complexity(item),
+                        decorators=method_decorators,
+                        is_method=True,
                     )
                 )
         
@@ -152,12 +186,16 @@ class ModuleVisitor(ast.NodeVisitor):
             line_number=node.lineno,
             methods=methods,
             end_line_number=getattr(node, "end_lineno", None),
+            decorators=decorators,
         )
         self.classes.append(class_def)
         
         prev_scope = self._current_scope
+        prev_in_class = self._in_class
         self._current_scope = f"{self._current_scope}.{node.name}" if self._current_scope else node.name
+        self._in_class = True
         self.generic_visit(node)
+        self._in_class = prev_in_class
         self._current_scope = prev_scope
         
     def visit_FunctionDef(self, node):
@@ -171,18 +209,24 @@ class ModuleVisitor(ast.NodeVisitor):
         if self._current_scope:
             name = f"{self._current_scope}.{name}"
             
+        decorators = [_get_decorator_name(d) for d in node.decorator_list]
         self.functions.append(
             FunctionDef(
                 name=name,
                 line_number=node.lineno,
                 end_line_number=getattr(node, "end_lineno", None),
-                complexity=calculate_complexity(node)
+                complexity=calculate_complexity(node),
+                decorators=decorators,
+                is_method=self._in_class,
             )
         )
         
         prev_scope = self._current_scope
+        prev_in_class = self._in_class
         self._current_scope = name
+        self._in_class = False
         self.generic_visit(node)
+        self._in_class = prev_in_class
         self._current_scope = prev_scope
 
     def visit_If(self, node):
@@ -190,6 +234,46 @@ class ModuleVisitor(ast.NodeVisitor):
             left = node.test.left
             if isinstance(left, ast.Name) and left.id == "__name__":
                 self.has_main_block = True
+        self.generic_visit(node)
+        
+    def visit_Constant(self, node):
+        if isinstance(node.value, str) and len(node.value) > 2:
+            self.string_literals.append(node.value)
+        self.generic_visit(node)
+
+    def visit_Name(self, node):
+        if isinstance(node.ctx, ast.Load):
+            self.referenced_names.add(node.id)
+        self.generic_visit(node)
+
+    def visit_Attribute(self, node):
+        if isinstance(node.ctx, ast.Load):
+            self.referenced_names.add(node.attr)
+        self.generic_visit(node)
+
+    def visit_Assign(self, node):
+        if not self._current_scope:
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    if target.id == "__all__":
+                        if isinstance(node.value, (ast.List, ast.Tuple, ast.Set)):
+                            for elt in node.value.elts:
+                                if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
+                                    self.exported_names.add(elt.value)
+                    elif not target.id.startswith("__"):
+                        self.variables.append(VariableDef(name=target.id, line_number=node.lineno))
+        self.generic_visit(node)
+
+    def visit_AnnAssign(self, node):
+        if not self._current_scope:
+            if isinstance(node.target, ast.Name):
+                if node.target.id == "__all__":
+                    if isinstance(node.value, (ast.List, ast.Tuple, ast.Set)):
+                        for elt in node.value.elts:
+                            if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
+                                self.exported_names.add(elt.value)
+                elif not node.target.id.startswith("__"):
+                    self.variables.append(VariableDef(name=node.target.id, line_number=node.lineno))
         self.generic_visit(node)
         
     def visit_Import(self, node):
@@ -271,4 +355,8 @@ def parse_module(file_path: Path, package_root: Path) -> Module | Finding:
         functions=visitor.functions,
         imports=visitor.imports,
         has_main_block=visitor.has_main_block,
+        string_literals=visitor.string_literals,
+        referenced_names=visitor.referenced_names,
+        exported_names=visitor.exported_names,
+        variables=visitor.variables,
     )

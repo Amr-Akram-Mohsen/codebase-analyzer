@@ -62,3 +62,15 @@ class TestCycles:
         findings = find_cycles(graph)
         assert len(findings) == 1
         assert "myapp.a" in findings[0].message
+
+    def test_directed_cycle_order_matches_edges(self) -> None:
+        # Cycle is a -> c -> b -> a
+        # Alphabetical sort would give a -> b -> c -> a, which would be false!
+        graph = {
+            "myapp.a": {"myapp.c"},
+            "myapp.c": {"myapp.b"},
+            "myapp.b": {"myapp.a"},
+        }
+        findings = find_cycles(graph)
+        assert len(findings) == 1
+        assert findings[0].message == "Cycle: myapp.a -> myapp.c -> myapp.b -> myapp.a"

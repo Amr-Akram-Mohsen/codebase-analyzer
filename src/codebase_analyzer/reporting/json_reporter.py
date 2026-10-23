@@ -19,6 +19,8 @@ def format_json(result: AnalysisResult) -> str:
     def enum_encoder(obj):
         if hasattr(obj, "value"):
             return obj.value
+        if isinstance(obj, set):
+            return sorted(list(obj))
         raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
     # asdict converts the dataclasses to dictionaries recursively
